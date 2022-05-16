@@ -1,3 +1,5 @@
+import os.path
+
 import matplotlib.pyplot as plt
 
 import scanpy as sc
@@ -9,36 +11,38 @@ import numpy as np
 from pathlib import Path
 
 from outer_spacem.pl import plot_distributions, plot_umap_top_n, volcano_plot
+from singlecelltools.various import get_molecules_names
 
-well = "Well_3"
+well = "Well_8"
+postfix = "_log_transform"
 
 if well == "Well_8":
     # -------- WELL 8 -----------------------:
     adata = sc.read(
-        "/Users/alberto-mac/Documents/DA_ESPORTARE/LOCAL_EMBL_FILES/scratch/projects/gastrosome_processing/SpaceM_processing_new/Drug_W8/analysis/single_cell_analysis/spatiomolecular_adata.h5ad")  # assuming you only have 1 dataset
+        "/Users/alberto-mac/EMBL_ATeam/projects/gastrosome/Drug_W8/spatiomolecular_adata.h5ad")  # assuming you only have 1 dataset
 
     # filter out extracell stuff
-    intracell_ions = pd.read_csv("/Users/alberto-mac/EMBL_ATeam/projects/gastrosome/AB_Gastrosome_DrugW8_intra_ions_v2.tsv",
+    intracell_ions = pd.read_csv("/Users/alberto-mac/EMBL_ATeam/projects/gastrosome/molecules_databases/reannotated/AB_Gastrosome_DrugW8_intra_ions_v2.tsv",
                                  sep="\t", index_col=0)
     # adata = adata[:, adata.var.formula.isin(intracell_ions["name"])].copy()
 
 
-    data_dir = Path(r"/Users/alberto-mac/EMBL_ATeam/projects/gastrosome")
+    data_dir = Path(r"/Users/alberto-mac/EMBL_ATeam/projects/gastrosome/Drug_W8")
 
-    proj_dir = "Drug_W8_new_processing"
+    proj_dir = "new_processing" + postfix
 elif well == "Well_3":
     # -------- WELL 3 -----------------------:
-    adata = sc.read("/Users/alberto-mac/Documents/DA_ESPORTARE/LOCAL_EMBL_FILES/scratch/projects/gastrosome_processing/SpaceM_processing_new/Feeding_W3/analysis/single_cell_analysis/spatiomolecular_adata.h5ad") # assuming you only have 1 dataset
+    adata = sc.read("/Users/alberto-mac/EMBL_ATeam/projects/gastrosome/Feeding_W3/spatiomolecular_adata.h5ad") # assuming you only have 1 dataset
 
     # filter out extracell stuff
-    intracell_ions = pd.read_csv("/Users/alberto-mac/EMBL_ATeam/projects/gastrosome/AB_Gastrosome_FeedingW3_intra_ions_v1.tsv", sep="\t", index_col=0)
+    intracell_ions = pd.read_csv("/Users/alberto-mac/EMBL_ATeam/projects/gastrosome/molecules_databases/reannotated/AB_Gastrosome_FeedingW3_intra_ions_v1.tsv", sep="\t", index_col=0)
     intracell_ions.head()
     # adata = adata[:, adata.var.formula.isin(intracell_ions["name"])].copy()
 
 
-    data_dir = Path(r"/Users/alberto-mac/EMBL_ATeam/projects/gastrosome")
+    data_dir = Path(r"/Users/alberto-mac/EMBL_ATeam/projects/gastrosome/Feeding_W3")
 
-    proj_dir = "Feeding_W3_new_processing"
+    proj_dir = "new_processing" + postfix
 else:
     raise ValueError
 
@@ -74,16 +78,32 @@ nb_marked_cells = (adata.obs[cond_col] == "Gastrosomes").sum()
 total_nb_cells = adata.obs[cond_col].shape[0]
 print("Gastrosomes: {}/{} cells".format(nb_marked_cells, total_nb_cells))
 
-adata.var["moleculeNamesStr"] = adata.var.moleculeNames.apply(convert_name)
 
-# Use ion formula and shortened name as an actual label
-adata.var["var_names"] = [ion + " " + name for ion, name in zip(adata.var.index, adata.var.moleculeNamesStr)]
+# # ---------------------------
+# # Fix the mess with the molecules names:
+# # ---------------------------
+#
+# # Get original databases properly annotated:
+# CM = pd.read_csv(
+#     "/Users/alberto-mac/EMBL_ATeam/projects/gastrosome/molecules_databases/core_metabolome_v3.csv",
+#     sep="\t", index_col=0)
+#
+# SwissLip = pd.read_csv(
+#     "/Users/alberto-mac/EMBL_ATeam/projects/gastrosome/molecules_databases/swisslipids_2018-02-02-v2.tsv",
+#     sep="\t", index_col=0)
+#
+# CM.to_csv("/Users/alberto-mac/EMBL_ATeam/projects/gastrosome/Drug_W8/test_data.csv")
+#
+# combined_databases = pd.concat([CM, SwissLip])
+# merged_database = combined_databases.merge(adata.var, on='formula')
+
+
 
 # filter out low ion cells
 sc.pp.filter_cells(adata, min_genes=5)
 
 # TIC norm
-# sc.pp.normalize_total(adata, key_added='tic')
+# sc.pp.normalize_total(adata, key_added='tic', target_sum=1.)
 
 # Alternative norm method by Alyona:
 adata.obs["tic"] = adata.X.sum(axis=1)
@@ -150,15 +170,18 @@ sc.pp.normalize_total(adata, target_sum=1., key_added='tic')
 # --------------------------
 # DE analysis:
 # --------------------------
+# adata.X = np.log1p(adata.X)
 sc.tl.rank_genes_groups(adata, cond_col, method='wilcoxon', key_added="wilcoxon", gene_symbols="var_names")
 # sc.pl.rank_genes_groups(adata, n_genes=25, sharey=False, key="wilcoxon", gene_symbols="var_names")
 
-diff_expr_df = sc.get.rank_genes_groups_df(adata, None, key="wilcoxon", gene_symbols="var_names")
-
-diff_expr_df = diff_expr_df.sort_values("pvals_adj", ascending=True)
-diff_expr_df.head(5)
 
 selected = volcano_plot(adata, "wilcoxon", plots_path, pval_thresh=0.05, foldch_thresh=2, gene_symbols="var_names")
+
+# Export results to csv:
+diff_expr_df = sc.get.rank_genes_groups_df(adata, None, key="wilcoxon", gene_symbols="var_names")
+diff_expr_df = diff_expr_df.sort_values("pvals_adj", ascending=True)
+diff_expr_df = diff_expr_df[diff_expr_df["group"] == "Gastrosomes"]
+diff_expr_df.to_csv(os.path.join(plots_path, "DE_results.csv"))
 
 # # --------------------------
 # # Plot distributions:
