@@ -16,7 +16,14 @@ from pathlib import Path
 from outer_spacem.pl._diff_expr import plot_distributions
 # from singlecelltools.various import get_molecules_names
 
+SAVE_ADATA = True
+
 well = "Drug_W8"
+export_only_significant = True
+#
+# well = "Feeding_W3"
+# export_only_significant = False
+
 analysis_name = "magic_v1.1"
 
 main_dir = os.path.join("/Users/alberto-mac/EMBL_ATeam/projects/gastrosome",
@@ -62,24 +69,20 @@ total_nb_cells = adata.obs[cond_col].shape[0]
 print("Gastrosomes: {}/{} cells".format(nb_marked_cells, total_nb_cells))
 
 
-# # ---------------------------
-# # Fix the mess with the molecules names:
-# # ---------------------------
-#
-# # Get original databases properly annotated:
-# CM = pd.read_csv(
-#     "/Users/alberto-mac/EMBL_ATeam/projects/gastrosome/molecules_databases/core_metabolome_v3.csv",
-#     sep="\t", index_col=0)
-#
-# SwissLip = pd.read_csv(
-#     "/Users/alberto-mac/EMBL_ATeam/projects/gastrosome/molecules_databases/swisslipids_2018-02-02-v2.tsv",
-#     sep="\t", index_col=0)
-#
-# CM.to_csv("/Users/alberto-mac/EMBL_ATeam/projects/gastrosome/Drug_W8/test_data.csv")
-#
-# combined_databases = pd.concat([CM, SwissLip])
-# merged_database = combined_databases.merge(adata.var, on='formula')
+# Get INCHI names:
+from singlecelltools.various import get_inchi
+MS_databases = [
+    pd.read_csv(
+        "/Users/alberto-mac/EMBL_ATeam/projects/gastrosome/molecules_databases/core_metabolome_v3.csv",
+        sep="\t"),
+    pd.read_csv(
+        "/Users/alberto-mac/EMBL_ATeam/projects/gastrosome/molecules_databases/swisslipids_2018-02-02-v2.tsv",
+        sep="\t")
+]
 
+
+if not SAVE_ADATA:
+    adata = get_inchi(adata, MS_databases, copy=False)
 
 print("Cells before filtering:", adata.shape[0])
 sc.pp.filter_cells(adata, min_genes=10)
@@ -95,6 +98,12 @@ sc.pp.log1p(adata)
 sc.pp.normalize_total(adata, key_added='tic')
 adata_pre_magic = adata.copy()
 sc.external.pp.magic(adata, name_list="all_genes", t=5, solver="exact")
+
+if SAVE_ADATA:
+    # Save modified adata to file:
+    # adata.obs.rename(columns={"Cell type": "cell_type"})
+    adata.write(Path(plots_path) / "adata_filtered.h5ad")
+    exit(0)
 
 old_stuff = False
 
@@ -236,12 +245,15 @@ for group in adata.obs[groupname].unique().categories:
         # Add molecules names:
         df = df.rename(columns={'names': 'annotation_id',
                                 "significance": "Cell Type"})
-        df = pd.merge(df, adata.var[['annotation_id', 'moleculeNames']],
+        df = pd.merge(df, adata.var[['annotation_id', 'moleculeNames', 'inchi', 'moleculeIds']],
                       on="annotation_id",
                       how='left')
 
         # Save relevant scores in file:
-        selected_df = df[significance]
+        if export_only_significant:
+            selected_df = df[significance]
+        else:
+            selected_df = df
 
         df_path = "{}/{}_{}_markers.csv".format(plots_path, groupname.replace(" ", "_"), group)
 
