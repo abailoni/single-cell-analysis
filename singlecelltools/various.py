@@ -33,7 +33,9 @@ def get_molecules_names(am_matrix):
     # print(f"Mapped {selected_metabolites.size} sum formulas to {len(db_df)} molecule names.")
 
 
-def get_inchi(adata, list_molecules_dbs, copy=True):
+def get_inchi(adata, list_molecules_dbs, copy=True,
+              name_molecude_id_col="moleculeIds", name_annotation_id_col="annotation_id",
+              name_out_inchi_col="inchi"):
     """
     If copy is False, adata object is updated. If True, the updated adata.var dataframe is returned
     """
@@ -45,10 +47,10 @@ def get_inchi(adata, list_molecules_dbs, copy=True):
 
     # Unroll lists in the adata.var dataframe:
     for _, row in adata.var.iterrows():
-        ids = eval(row.moleculeIds)
+        ids = eval(row[name_molecude_id_col])
         new_df_data["mol_id"] += ids
         new_df_data["mol_index"] += range(len(ids))
-        new_df_data["annotation_id"] += [row.annotation_id for _ in range(len(ids))]
+        new_df_data["annotation_id"] += [row[name_annotation_id_col] for _ in range(len(ids))]
         new_df_data["num_mols"] += [len(ids) for _ in range(len(ids))]
         # idx_range = range(len(ids))
     new_df = pd.DataFrame(new_df_data)
@@ -61,19 +63,19 @@ def get_inchi(adata, list_molecules_dbs, copy=True):
     var_df = adata.var.copy()
     inchi_lists = [None for _ in range(len(var_df))]
     for _, row in merged_df.iterrows():
-        idx = var_df.index.get_loc(row.annotation_id)
+        idx = var_df.index.get_loc(row[name_annotation_id_col])
         inchi = inchi_lists[idx]
         if inchi is None:
             inchi = [None for _ in range(row.num_mols)]
         inchi[row.mol_index] = str(row.inchi)
         inchi_lists[idx] = inchi
 
-    var_df["inchi"] = inchi_lists
+    var_df[name_out_inchi_col] = inchi_lists
 
     if copy:
         return var_df
     else:
-        adata.var["inchi"] = inchi_lists
+        adata.var[name_out_inchi_col] = inchi_lists
         return adata
 
 
