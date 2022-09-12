@@ -1,0 +1,14 @@
+### Gastrosome
+- All final scripts are in the `singlecell_analaysis` folder.
+- Metadata file: `/scratch/projects/gastrosome_processing_full/spacem/spacem_datasets_paths_filtered.csv`
+- Comparing gastrosomes to other control cells:
+  - `04_sc_analysis_gastrosomes.ipynb`
+  - `/Users/alberto-mac/EMBL_ATeam/projects/gastrosome_compare_conditions/single_cell_gastrosomes_v4_all_gastrosomes/plots`
+  - `/Users/alberto-mac/EMBL_ATeam/projects/gastrosome_compare_conditions/single_cell_gastrosomes_v4_all_gastrosomes/LION_notebook.Rmd`
+- Comparing drugs vs control:  `03_sc_analysis.ipynb`
+  - Latest plot dir: `"/Users/alberto-mac/EMBL_ATeam/projects/gastrosome_compare_conditions/single_cell_v6_W8_updated_fixed/plots"`
+  - `/Users/alberto-mac/EMBL_ATeam/projects/gastrosome_compare_conditions/single_cell/LION/R_notebook.Rmd`
+- Comparing gastrosomes vs drug cells in the same well:
+  - `diff_express_analysis_gastr_vs_drugs.py`
+  - Saved in random other folder: `/Users/alberto-mac/EMBL_ATeam/projects/gastrosome/WellName/reprocessing/v3_fixed_W8"`
+  - `/Users/alberto-mac/EMBL_ATeam/projects/gastrosome/LION_R/R_notebook.Rmd`

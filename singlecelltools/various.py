@@ -1,6 +1,7 @@
 import json
 import pandas as pd
 import numpy as np
+from copy import deepcopy
 
 
 def get_molecules_names(am_matrix):
@@ -33,11 +34,79 @@ def get_molecules_names(am_matrix):
     # print(f"Mapped {selected_metabolites.size} sum formulas to {len(db_df)} molecule names.")
 
 
-def get_inchi(adata, list_molecules_dbs, copy=True,
+
+def get_inchi_and_ids(adata, copy=True,
+              name_mol_names_col="moleculeNames",
+              out_name_inchi_col="inchi",
+              out_name_molId_col="moleculeIds",
+                      ):
+    new_df_data = {
+                   'mol_index': [],
+                   'num_mols': [],
+                   'annotation_id': [],
+                   'mol_name': []}
+
+    # Unroll lists in the adata.var dataframe:
+    for _, row in adata.var.iterrows():
+        names = eval(row[name_mol_names_col])
+        # some names are itself a list, so decompose it:
+        idx_to_pop = []
+        for i, name in enumerate(deepcopy(names)):
+            try:
+                name_eval = eval(name)
+                if isinstance(name_eval, list):
+                    idx_to_pop.append(i)
+                    names += name_eval
+            except BaseException:
+                pass
+        for i in idx_to_pop:
+            names.pop(i)
+
+        new_df_data["mol_name"] += names
+        new_df_data["mol_index"] += range(len(names))
+        new_df_data["num_mols"] += [len(names) for _ in range(len(names))]
+        new_df_data["annotation_id"] += [row["annotation_id"] for _ in range(len(names))]
+        # idx_range = range(len(ids))
+    new_df = pd.DataFrame(new_df_data)
+
+    # Now merge with METASPACE molecule databases:
+    combined_molecules_wo_duplicates = pd.read_csv(
+        "/Users/alberto-mac/EMBL_ATeam/projects/gastrosome/molecules_databases/merged_wo_duplicates.csv")
+
+    merged_df = pd.merge(new_df, combined_molecules_wo_duplicates, how="left", left_on="mol_name", right_on="name")
+
+    print(f"Number of not found molecules: {merged_df.name.isna().sum()}")
+
+    # Finally, get inchi column in original format:
+    var_df = adata.var.copy()
+    inchi_lists = [None for _ in range(len(var_df))]
+    id_lists = [None for _ in range(len(var_df))]
+    for _, row in merged_df.iterrows():
+        idx = var_df.index.get_loc(row["annotation_id"])
+        inchi = inchi_lists[idx]
+        ids = id_lists[idx]
+        if inchi is None:
+            inchi = [None for _ in range(row.num_mols)]
+            ids = [None for _ in range(row.num_mols)]
+        inchi[row.mol_index] = str(row.inchi)
+        ids[row.mol_index] = str(row.id)
+        inchi_lists[idx] = inchi
+        id_lists[idx] = ids
+
+    if copy:
+        var_df[out_name_inchi_col] = inchi_lists
+        var_df[out_name_molId_col] = id_lists
+        return var_df
+    else:
+        adata.var[out_name_inchi_col] = inchi_lists
+        adata.var[out_name_molId_col] = id_lists
+        return adata
+
+def get_inchi_old(adata, list_molecules_dbs, copy=True,
               name_molecude_id_col="moleculeIds", name_annotation_id_col="annotation_id",
               name_out_inchi_col="inchi"):
     """
-    If copy is False, adata object is updated. If True, the updated adata.var dataframe is returned
+    If copy is False, adata object is returned. If True, the updated adata.var dataframe is returned
     """
 
     new_df_data = {'annotation_id': [],
@@ -58,6 +127,11 @@ def get_inchi(adata, list_molecules_dbs, copy=True,
     # Now merge with METASPACE molecule databases:
     combined_molecules_db = pd.concat(list_molecules_dbs)
     merged_df = pd.merge(new_df, combined_molecules_db, how="left", left_on="mol_id", right_on="id")
+
+    count = list_molecules_dbs[0].name.value_counts() == 2
+
+    # list_molecules_dbs[0][list_molecules_dbs[0].name.isin(count[count.values].index].to_csv(
+    #     "/Users/alberto-mac/EMBL_ATeam/projects/gastrosome/test.csv")
 
     # Finally, get inchi column in original format:
     var_df = adata.var.copy()
