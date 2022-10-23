@@ -1,0 +1,66 @@
+general:
+  analysis_id: Jeany-optimization # General identifier of the analysis
+  metadata_file: /Users/alberto-mac/EMBL_ATeam/projects/MALDI_opt/projects/jeany_opt/all_metadata.csv # Can be CSV, TSV, XLSX or gdrive ID prefixed with 'gdrive:'
+  project_description:
+    "Sample description of the project in this report.
+    
+    Newlines can be added by leaving a blank line.
+
+    If you want to insert things in \"quotes\", you will need the escape character \\
+    "
+
+  # Metadata columns containing batch information: (PCA will be done independently for data in different batches)
+  batch_keys:
+    - Matrix
+#    - polarity
+
+  # Optimization parameters:
+  optimization_key_1: Matrix # Metadata column containing the first parameter that you optimized
+  optimization_key_2: RF # Metadata column containing a second parameter that you optimized (Set to Null or comment out if you only optimized for one parameter)
+
+  # Replicate naming scheme:
+  #    If left empty (comment out or set to Null), all replicates (same condition, same optim params) will be randomly named 0, 1, 2, 3...
+  #    Otherwise you can set the naming scheme for example to "{slide}-{row}{col}" or to "{replicate_number}" if repl information is present in metadata columns.
+  repl_name: "{slide}" # TODO: implement the automatic feature
+
+  masking_key: Null # Metadata column to optionally mask datasets if the masking value is truthy
+#  name_format: "{row}{col}-{slide} {condition}" # Naming scheme to identify datasets #TODO: remove, deprecated?
+  bio_key: Condition # Metadata column containing biological labels (treatments, cell types etc.)
+  palette: # Color palette for color coding lables & UMAPs
+    Control: '#b0bc89'
+    2DG: '#d7a4a1'
+
+  metaspace_dt_id_key: "datasetId" # Metadata column with metaspace ID of the datasets
+
+  adata_pattern: /Users/alberto-mac/EMBL_ATeam/projects/MALDI_opt/projects/jeany_opt/metaspace_datasets/pixel_matrix_{row}{col}-{slide}.h5ad # Pattern to define where AnnDatas have been downloaded to
+  min_sampling_ratio: 0.9 # Minimum extimated sampling ratio (see pixel data download notebook)
+
+  # Selected markers for which to plot detectability and intensities values (they are ignored if not present in a specific dataset)
+  # Please specify both the molecule and the adduct.
+  # Optionally, you can specify a name for the marker that will be displayed in the plots (otherwise the first available annotation name will be used)
+  markers:
+    - ['C5H5N5', "Adenine"]
+    - ['C5H5N5O', "Guanine"]
+    - ["C4H5N3O",      "Cytosine"]
+    - ["C5H6N2O2",     "Thymine"]
+    - ["C4H4N2O2",     "Uracil"]
+    - ["C5H9NO4",       "Glutamic acid"]
+    - ["C10H17N3O6S",  "Glutathione"]
+    - [C6H8O7, citrate]
+    - [C6H14O12P2, fructose-bisphosphate]
+    - [C6H13O9P, glucose-phosphate]
+    - [C5H9NO4, glutamate]
+    - [C4H6O5, malate]
+    - [C4H4O4, fumarate]
+    - [C4H6O4, succinate]
+    - [C6H12O6, glucose]
+    - [C6H14N4O2, arginine]
+    - [C4H8N2O3, asparagine]
+    - [C5H12N2O2, ornithine]
+    - [C4H7NO4, aspartate]
+    - [C2H7NO3S, taurine]
+    - [C4H9NO3, threonine]
+    - [C16H32O2, palmitate]
+    - [C18H34O2, oleate]
+    - [C10H14N5O7P, AMP]
+
