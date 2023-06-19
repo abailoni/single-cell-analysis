@@ -14,7 +14,7 @@ from pathlib import Path
 
 
 # from outer_spacem.pl import plot_distributions, plot_umap_top_n, volcano_plot
-from outer_spacem.pl._diff_expr import plot_distributions
+# from outer_spacem.pl._diff_expr import plot_distributions
 # from singlecelltools.various import get_molecules_names
 
 SAVE_ADATA = False
@@ -58,7 +58,7 @@ main_dir = os.path.join("/Users/alberto-mac/EMBL_ATeam/projects/gastrosome",
 
 # //////////////////
 # Old direct import:
-adata = sc.read("/Users/alberto-mac/Documents/DA_ESPORTARE/LOCAL_EMBL_FILES/scratch/projects/gastrosome_processing_full/spacem_synced/slide6/W8/analysis/single_cell_analysis/spatiomolecular_adata.h5ad")
+adata = sc.read("/Users/alberto-mac/Documents/DA_ESPORTARE/LOCAL_EMBL_FILES/scratch/bailoni/projects/gastrosome_processing_full/spacem_synced/slide6/W8/analysis/single_cell_analysis/spatiomolecular_adata.h5ad")
 #
 # # metadata_subset = metadata.loc[metadata.index.isin([3]), :]
 # # adata2 = osm.io.bulk_read(
@@ -237,9 +237,9 @@ for group in adata.obs[groupname].unique().categories:
         df.insert(0, groupname, group)
 
         significance = (df["pvals_adj"] < pval_thres) & (df["logfoldchanges"].abs() > np.log2(fc_thres))
-        df["significance"] = np.where(significance, "Other cells treated with drug", "-")
-        df["significance"][significance & (df["logfoldchanges"] > 0)] = "Gastrosomes"
-        df["significance"].astype("category")
+        df["Significance"] = np.where(significance, "True (Gastrosomes down)", "False")
+        df["Significance"][significance & (df["logfoldchanges"] > 0)] = "True (Gastrosomes up)"
+        df["Significance"].astype("category")
 
         df["pvals_adj_nlog10"] = -np.log10(df["pvals_adj"] + np.finfo("f8").eps)
 
@@ -254,36 +254,16 @@ for group in adata.obs[groupname].unique().categories:
                   "#17becf"]
 
         # Set your custom color palette
+        sns.set(font_scale=1.2)
         sns.set_palette(sns.color_palette(colors))
 
-        plt.figure(figsize=[15, 5])
-        sns.scatterplot(
-            data=df,
-            x="logfoldchanges",
-            y="pvals_adj_nlog10",
-            s=10,
-            linewidth=0,
-            hue="significance",
-            # palette="tab10"
-            legend=False
-        )
-        plt.xlabel("Fold Changes: $\log_2 (FC)$")
-        plt.ylabel("p-values: $-\log_{10}(p)$")
-        plt.legend(loc="lower left", title="Significance",
-                   labels=['Gastrosomes (up)',
-                           '-',
-                           "Other cells treated with drug (down)"])
-        plt.title(f"Gastrosomes (right) vs other cells treated with drugs", fontsize=20)
-        # plt.title(f"{groupname}={group}", fontsize=20)
-        plt.xlim(-3,3)
-        plt.savefig(os.path.join(plots_path, f"volcano_plot_{group}.png"), dpi=300)
-        plt.show()
+
 
         df = df.drop(columns="Cell type")
 
         # Add molecules names:
         df = df.rename(columns={'names': 'annotation_id',
-                                "significance": "Cell Type"})
+                                })
         df = pd.merge(df, adata.var[['annotation_id', mol_ids_col, mol_names_col]],
                       on="annotation_id",
                       how='left')
@@ -292,40 +272,110 @@ for group in adata.obs[groupname].unique().categories:
             mol_names_col: 'moleculeNames',
             mol_ids_col: 'moleculeIds', })
 
+
+
+        plt.figure(figsize=[15, 5])
+
+        sns.scatterplot(
+            data=df,
+            x="logfoldchanges",
+            y="pvals_adj_nlog10",
+            s=10,
+            linewidth=0,
+            hue="Significance",
+            # size=15,
+            # palette="tab10"
+            # legend=False,
+        )
+        plt.xlabel("Fold Changes: $\log_2 (FC)$")
+        plt.ylabel("p-values: $-\log_{10}(p)$")
+        # plt.legend(loc="lower left", title="Significance",
+        #            labels=['Gastrosomes (up)',
+        #                    '-',
+        #                    "Other cells treated with drug (down)"])
+        # plt.legend(loc="lower left", title="Significance",
+        #            # labels=['Gastrosomes (up)',
+        #            #         '-',
+        #            #         "Other cells treated with drug (down)"]
+        #            )
+        plt.title(f"Gastrosomes vs other cells treated with drugs", fontsize=20)
+        # plt.title(f"{groupname}={group}", fontsize=20)
+        plt.xlim(-3,3)
+
+        # # Add marker labels:
+        # line_colors = plt.rcParams['axes.prop_cycle'].by_key()['color']
+        # line_colors *= 100
+        # # for (row_i, col_j, cue), data_ijk in g.facet_data():
+        # #     ax = g.facet_axis(row_i, col_j)
+        # # batch_name = data_ijk[BATCH_KEY_COL].unique()[0]
+        # # covered_markers = covered_markers_collected[batch_name]
+        # markers_to_label = df[df["Significance"] != "False"]
+        #
+        # # Get plot limits and place labels randomly:
+        # xlims = plt.xlim()
+        # ylims = plt.ylim()
+        # x_range = xlims[1] - xlims[0]
+        # y_range = ylims[1] - ylims[0]
+        #
+        # for i, (_, row) in enumerate(markers_to_label.iterrows()):
+        #     text_x = row["logfoldchanges"] + np.random.rand() * 0.05
+        #     text_y = row["pvals_adj_nlog10"] + (np.random.rand()) * 0.05 * df["pvals_adj_nlog10"].max()
+        #     # text_x = xlims[0] + x_range * 0.1 + (np.random.rand() * (x_range * 0.6))
+        #     # text_y = ylims[0] + y_range * 0.1 + (np.random.rand() * (y_range * 0.8))
+        #     plt.plot((row["logfoldchanges"], text_x), (row["pvals_adj_nlog10"], text_y), alpha=0.6,
+        #              color=line_colors[i])
+        #
+        #     # Get the first name:
+        #     # plt.text(text_x, text_y, s=f"{row['ion']} ({eval(row['moleculeNames'])[0]})", alpha=0.9)
+        #     plt.text(text_x, text_y, s=f"{row['ion']}", alpha=0.9, size=10)
+        #     # break
+
+        plt.tight_layout()
+        plt.savefig(os.path.join(plots_path, f"volcano_plot_{group}.pdf"), dpi=300)
+        plt.show()
+
+        df.rename(columns={"annotation_id": "ion"}, inplace=True)
+        reordered_cols = ['Significance', 'ion', 'scores', 'logfoldchanges', 'pvals', 'pvals_adj',
+                          'pvals_adj_bonferroni',
+                          'moleculeIds',
+                          'moleculeNames']
+        df = df[reordered_cols]
+
         # Save relevant scores in file:
         if export_only_significant:
             selected_df = df[significance]
         else:
             selected_df = df
 
+
         df_path = "{}/{}_{}_markers.csv".format(plots_path, groupname.replace(" ", "_"), group)
 
         print(df_path)
-        selected_df["Cell Type"] = np.where(selected_df["Cell Type"] == group, group + " (up)",
-                                          group + " (down)")
+        # selected_df["Cell Type"] = np.where(selected_df["Cell Type"] == group, group + " (up)",
+        #                                   group + " (down)")
         selected_df.to_csv(df_path, index=False)
 
-        # Export distributions:
-        for adata_to_plot in [(adata, "post_magic"), (adata_pre_magic, "pre_magic")]:
-            for i, export_group_name in enumerate(["Gastrosomes", "Other cells treated with drug"]):
-                adata_filtered = adata_to_plot[0].copy()
-
-                # adata_filtered.var.astype({'annotation_id': 'string'}, copy=False)
-                # adata_filtered.var = adata_filtered.var.set_index('annotation_id')
-                # adata_filtered.var = adata_filtered.var.reindex(index=df['annotation_id'])
-                # adata_filtered.var = adata_filtered.var.reset_index()
-
-                # df.astype({'annotation_id': 'string'}, copy=False)
-                merged_df = pd.merge(adata_filtered.var,
-                                          df[['annotation_id', 'Cell Type']],
-                              on="annotation_id",
-                              how='left')
-                # adata_filtered.var.astype({'Cell Type': 'category'}, copy=False)
-                adata_filtered = adata_filtered[:, merged_df["Cell Type"] == export_group_name]
-                # adata_filtered = adata_filtered[:, adata_filtered.var["annotation_id"] == "C4H9O7P+Na"]
-                dist_plots_path = os.path.join(plots_path, "distributions_{}".format(adata_to_plot[1]), export_group_name.replace(" ", "_", ))
-                os.makedirs(dist_plots_path, exist_ok=True)
-                plot_distributions(adata_filtered, cond_col, Path(dist_plots_path), gene_symbols="annotation_id")
+        # # Export distributions:
+        # for adata_to_plot in [(adata, "post_magic"), (adata_pre_magic, "pre_magic")]:
+        #     for i, export_group_name in enumerate(["Gastrosomes", "Other cells treated with drug"]):
+        #         adata_filtered = adata_to_plot[0].copy()
+        #
+        #         # adata_filtered.var.astype({'annotation_id': 'string'}, copy=False)
+        #         # adata_filtered.var = adata_filtered.var.set_index('annotation_id')
+        #         # adata_filtered.var = adata_filtered.var.reindex(index=df['annotation_id'])
+        #         # adata_filtered.var = adata_filtered.var.reset_index()
+        #
+        #         # df.astype({'annotation_id': 'string'}, copy=False)
+        #         merged_df = pd.merge(adata_filtered.var,
+        #                                   df[['annotation_id', 'Significance']],
+        #                       on="annotation_id",
+        #                       how='left')
+        #         # adata_filtered.var.astype({'Significance': 'category'}, copy=False)
+        #         adata_filtered = adata_filtered[:, merged_df["Significance"] == export_group_name]
+        #         # adata_filtered = adata_filtered[:, adata_filtered.var["annotation_id"] == "C4H9O7P+Na"]
+        #         dist_plots_path = os.path.join(plots_path, "distributions_{}".format(adata_to_plot[1]), export_group_name.replace(" ", "_", ))
+        #         os.makedirs(dist_plots_path, exist_ok=True)
+                # plot_distributions(adata_filtered, cond_col, Path(dist_plots_path), gene_symbols="annotation_id")
 
 
 
