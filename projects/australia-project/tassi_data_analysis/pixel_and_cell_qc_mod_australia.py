@@ -181,7 +181,7 @@ def get_rank_genes_groups_df(adata_to_plot, group,
     # Add inchi column and molecule names:
     df.rename(columns={"names": "ion"}, inplace=True)
     df = pd.merge(df, adata_to_plot.var[
-        ['annotation_id', 'moleculeNames', 'moleculeIds',
+        ['annotation_id', 'mz', 'moleculeNames', 'moleculeIds',
          'first_mol_name_short']],
                   left_on="ion",
                   right_on="annotation_id",
@@ -442,7 +442,7 @@ for slide_name in anndatas_per_slide:
                                 n_genes=15,
                                 save=f"_DE_{slide_name}.pdf")
 
-        umap_plots_significant_ions(adata_to_plot)
+        # umap_plots_significant_ions(adata_to_plot)
 
 
         mprint(f"### Volcano plots ({slide_name})")
