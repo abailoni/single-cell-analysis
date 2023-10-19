@@ -86,7 +86,7 @@ anndatas_per_slide = pickle.load(open(
     "/Users/alberto-mac/Documents/DA_ESPORTARE/LOCAL_EMBL_FILES/g_shared/shared/alberto/projects/spacem-reports/australia-project/initial_reports/anndatas_per_slide.pickle",
     "rb"))
 
-# #
+#
 # anndatas_per_slide = utils.load_anndatas_per_slide_batches(
 #     report_config,
 #     apply_filtering=True,
@@ -128,7 +128,7 @@ anndatas_per_slide = pickle.load(open(
 #
 # utils.dump_anndata_per_slide(anndatas_per_slide,
 #                              os.path.dirname(config_file))
-
+#
 # print("")
 
 
