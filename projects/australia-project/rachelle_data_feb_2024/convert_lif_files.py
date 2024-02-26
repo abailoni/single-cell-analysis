@@ -76,11 +76,8 @@ def convert_lif_australia_file_to_ngff_zarr(
         print(f"Loading img slide {slide_number}, well {well_number}...")
         channel_imgs = list(image.get_iter_c())
         channel_imgs = [np.asarray(img) for img in channel_imgs]
-        print(channel_imgs[0].shape)
         tczyx_shape = (1, len(channel_imgs), 1) + channel_imgs[0].shape[-2:]
         pre_maldi_image = da.concatenate(channel_imgs).reshape(tczyx_shape)
-        print(pre_maldi_image.shape)
-        continue
 
         ngff_collection = ngff_file.add_collection(well_number)
 
