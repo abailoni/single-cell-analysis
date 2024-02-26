@@ -6,6 +6,7 @@ from operator import itemgetter
 from pathlib import Path
 from typing import Union
 
+
 import dask.array as da
 import numpy as np
 import pims
@@ -71,10 +72,10 @@ def convert_australia_project_to_ngff_zarr(
         ngff_collection = ngff_file.add_collection(well_id)
         pre_maldi_paths, pre_maldi_channel_names = zip(*[(p, n) for p, n in zip(well_tiff_files, channel_names) if n in PRE_MALDI_CHANNELS])
         # Possibly remove "pre_maldi_" from channel names:
-        pre_maldi_channel_names = [n.replace("pre_maldi_", "") for n in pre_maldi_channel_names]
+        # pre_maldi_channel_names = [n.replace("pre_maldi_", "") for n in pre_maldi_channel_names]
         post_maldi_paths, post_maldi_channel_names = zip(*[(p, n) for p, n in zip(well_tiff_files, channel_names) if n in POST_MALDI_CHANNELS])
         # Possibly remove "post_maldi_" from channel names:
-        post_maldi_channel_names = [n.replace("post_maldi_", "") for n in post_maldi_channel_names]
+        # post_maldi_channel_names = [n.replace("post_maldi_", "") for n in post_maldi_channel_names]
         pre_maldi_image, pre_maldi_colors = _channel_paths_to_tczyx(pre_maldi_paths)
         post_maldi_image, post_maldi_colors = _channel_paths_to_tczyx(post_maldi_paths)
 
