@@ -79,9 +79,8 @@ def convert_lif_australia_file_to_ngff_zarr(
         tczyx_shape = (1, len(channel_imgs), 1) + channel_imgs[0].shape[-2:]
         pre_maldi_image = da.concatenate(channel_imgs).reshape(tczyx_shape)
 
-        ngff_collection = ngff_file.add_collection(well_number)
-
         print("Writing....")
+        ngff_collection = ngff_file.add_collection(well_number)
         ngff_collection.add_image(
             image_name="pre_maldi",
             array=pre_maldi_image,
