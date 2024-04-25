@@ -61,6 +61,9 @@ def convert_lif_australia_file_to_ngff_zarr(
             # Get the slide number and well number from the match
             slide_number, well_number = matches[0]
 
+            if slide_number != "4":
+                continue
+
             out_path = out_dir / f"slide_{slide_number}/microscopy.zarr"
             out_path.mkdir(exist_ok=True, parents=True)
 
@@ -135,8 +138,9 @@ def convert_lif_australia_file_to_ngff_zarr(
 if __name__ == "__main__":
     # typer.run(convert_lif_australia_file_to_ngff_zarr)
     convert_lif_australia_file_to_ngff_zarr(
-        input_lif_file=Path("/scratch/bailoni/datasets/australia_project/new_data_feb_2024/20240213_DA_neurons_11291_and_11574_d50_Cellbright_green_and_hoechst_pre_MSI.lif"),
-        out_dir=Path("/scratch/bailoni/datasets/australia_project/new_data_feb_2024/20240213_DA_neurons_11291_and_11574_d50_Cellbright_green_and_hoechst_pre_MSI"),
-        write_images=False,
+        input_lif_file=Path("/scratch/bailoni/datasets/australia_project/new_data_feb_2024/astrocytes_march_24/20240213_DA_neurons_11291_and_11574_d50_Cellbright_green_and_hoechst_pre_MSI.lif"),
+        out_dir=Path("/scratch/bailoni/datasets/australia_project/new_data_feb_2024/astrocytes_march_24/old_spacem"),
+        write_images=True,
         create_csv=True,
     )
+
