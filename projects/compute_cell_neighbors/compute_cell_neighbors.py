@@ -1,7 +1,15 @@
-from napari_ome_zarr import napari_get_reader
 import numpy as np
+from typing import List
+import pandas as pd
+from pathlib import Path
+
 from ome_zarr.types import PathLike
-from typing import Any, Callable, Dict, Iterator, List, Optional
+from napari_ome_zarr import napari_get_reader
+import scanpy as sc
+
+from nifty.graph import rag as nrag
+from nifty.graph import UndirectedGraph
+import vigra
 
 
 def load_ome_zarr_channels(ome_zarr_path: PathLike,
@@ -76,27 +84,21 @@ def get_channel_list_in_ome_zarr(ome_zarr_path: PathLike):
     return collected_channels
 
 
-import pandas as pd
-from pathlib import Path
-import scanpy as sc
-from nifty.graph import rag as nrag
-from nifty.graph import UndirectedGraph
-import vigra
-
 if __name__ == "__main__":
-    # project_dir = Path("/scratch/bailoni/projects/compute_cell_neighbors")
-    # root_pattern = "/scratch/abreu/{project}/D{donor}/{slide}/"
+    # How many pixels to dilate the cells, before computing the neighbors:
+    CELL_DILATION_RADIUS = 0
 
-    CELL_DILATION_RADIUS = 8
-    BRIGHTFIELD_CHANNEL = "Trans"
-
-    project_dir = Path("/Users/alberto-mac/Documents/DA_ESPORTARE/LOCAL_EMBL_FILES/scratch/bailoni/projects/compute_cell_neighbors")
-    root_pattern = "/Users/alberto-mac/Documents/DA_ESPORTARE/LOCAL_EMBL_FILES/scratch/abreu/{project}/D{donor}/{slide}/"
+    project_dir = Path("/scratch/bailoni/projects/compute_cell_neighbors")
+    root_pattern = "/scratch/abreu/{project}/D{donor}/{slide}/"
+    metadata_csv_file_path = project_dir / "metadata_seadrugs_raw_FULL.csv"
     target_pattern_anndata = project_dir / "{project}/D{donor}/{slide}/anndata/customdb_seadrugs_v2_neighbor_stats/{project}-D{donor}.{slide}.{row}{col}.cells.h5ad"
 
+    # project_dir = Path("/Users/alberto-mac/Documents/DA_ESPORTARE/LOCAL_EMBL_FILES/scratch/bailoni/projects/compute_cell_neighbors")
+    # root_pattern = "/Users/alberto-mac/Documents/DA_ESPORTARE/LOCAL_EMBL_FILES/scratch/abreu/{project}/D{donor}/{slide}/"
+
     # Load dataframe with dataset IDs:
-    main_metadata = pd.read_csv(project_dir / "metadata_seadrugs_raw.csv")
-    if "neighbors_processed" not in main_metadata.columns:
+    main_metadata = pd.read_csv(metadata_csv_file_path)
+    if "cell_neighbors_processed" not in main_metadata.columns:
         main_metadata["cell_neighbors_processed"] = False
 
     project_dir.mkdir(parents=True, exist_ok=True)
@@ -111,9 +113,23 @@ if __name__ == "__main__":
         anndata_path = anndata_path_pattern.format(**row)
         label_zarr_path = label_zarr_path_pattern.format(**row)
         target_pattern_anndata_path = str(target_pattern_anndata).format(**row)
-        print(f"Processing {Path(anndata_path).name}...")
+
+        # Take care of some inconsistencies in the anndata file names:
+        if not Path(anndata_path).exists():
+            anndata_path_pattern = root_pattern + "anndata/customdb_seadrugs_v2/{project}.{slide}.{row}{col}.cells.h5ad"
+            anndata_path = anndata_path_pattern.format(**row)
+            target_pattern_anndata_path = str(Path(target_pattern_anndata).parent / Path(anndata_path).name).format(**row)
+            if not Path(anndata_path).exists():
+                print(f"WARNING: Anndata path not found: {anndata_path}")
+                continue
+
 
         # Load label ome-zarr:
+        if not Path(label_zarr_path).exists():
+            print(f"WARNING: Label zarr path not found: {label_zarr_path}")
+            continue
+
+        print(f"Processing {Path(anndata_path).name}...")
         segmentation_mask = load_ome_zarr_channels(label_zarr_path, ['cells'])[0]
 
         # Experiment with growing the cells:
@@ -168,6 +184,10 @@ if __name__ == "__main__":
         # Now load the Anndata object:
         adata = sc.read(anndata_path)
 
+        if adata.obs.index.astype('int').max() > len(nb_neighbors):
+            print(f"WARNING: Number of cells {adata.obs.index.astype('int').max()} exceeds the number of cells in the segmentation mask {len(nb_neighbors)}. Original max: {segmentation_mask.max()} \n {anndata_path} \n {label_zarr_path}")
+            continue
+
         # Restrict nb_neighbors to the cells in the Anndata object:
         adata.obs["number_neighboring_cells"] = nb_neighbors[adata.obs.index.astype('int')]
 
@@ -178,5 +198,5 @@ if __name__ == "__main__":
         # Update metadata:
         main_metadata.at[index, "cell_neighbors_processed"] = True
         # Save metadata, so that we can resume the processing if something goes wrong:
-        main_metadata.to_csv(project_dir / "metadata_seadrugs_raw.csv", index=False)
+        main_metadata.to_csv(metadata_csv_file_path, index=False)
 
