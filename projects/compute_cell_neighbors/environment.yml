@@ -1,0 +1,13 @@
+name: compute_cell_neighbors
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python>=3.9
+  - napari-ome-zarr
+  - anndata
+  - scanpy
+  - nifty
+  - vigra
+  - scipy
+  - h5py

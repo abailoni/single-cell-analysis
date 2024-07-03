@@ -10,6 +10,7 @@ import scanpy as sc
 from nifty.graph import rag as nrag
 from nifty.graph import UndirectedGraph
 import vigra
+from zarr.errors import ArrayNotFoundError
 
 
 def load_ome_zarr_channels(ome_zarr_path: PathLike,
@@ -86,20 +87,26 @@ def get_channel_list_in_ome_zarr(ome_zarr_path: PathLike):
 
 if __name__ == "__main__":
     # How many pixels to dilate the cells, before computing the neighbors:
-    CELL_DILATION_RADIUS = 0
+    CELL_DILATION_RADIUS = 15
 
     project_dir = Path("/scratch/bailoni/projects/compute_cell_neighbors")
     root_pattern = "/scratch/abreu/{project}/D{donor}/{slide}/"
     metadata_csv_file_path = project_dir / "metadata_seadrugs_raw_FULL.csv"
-    target_pattern_anndata = project_dir / "{project}/D{donor}/{slide}/anndata/customdb_seadrugs_v2_neighbor_stats/{project}-D{donor}.{slide}.{row}{col}.cells.h5ad"
-
     # project_dir = Path("/Users/alberto-mac/Documents/DA_ESPORTARE/LOCAL_EMBL_FILES/scratch/bailoni/projects/compute_cell_neighbors")
     # root_pattern = "/Users/alberto-mac/Documents/DA_ESPORTARE/LOCAL_EMBL_FILES/scratch/abreu/{project}/D{donor}/{slide}/"
+    # metadata_csv_file_path = project_dir / "metadata_seadrugs_raw_filtered.csv"
+
+    target_pattern_anndata = project_dir / "results" / "{project}/D{donor}/{slide}/anndata/customdb_seadrugs_v2_neighbor_stats/{project}-D{donor}.{slide}.{row}{col}.cells.h5ad"
+
 
     # Load dataframe with dataset IDs:
     main_metadata = pd.read_csv(metadata_csv_file_path)
     if "cell_neighbors_processed" not in main_metadata.columns:
-        main_metadata["cell_neighbors_processed"] = False
+        main_metadata["cell_neighbors_processed"] = "False"
+    else:
+        main_metadata["cell_neighbors_processed"] = main_metadata["cell_neighbors_processed"].astype(str)
+
+
 
     project_dir.mkdir(parents=True, exist_ok=True)
 
@@ -107,7 +114,11 @@ if __name__ == "__main__":
     label_zarr_path_pattern = root_pattern + "microscopy.zarr/{row}{col}/pre_maldi"
 
     for index, row in main_metadata.iterrows():
-        if row["cell_neighbors_processed"]:
+        # Save metadata, so that we can resume the processing if something goes wrong:
+        main_metadata.to_csv(metadata_csv_file_path, index=False)
+
+        if row["cell_neighbors_processed"] == "True":
+            # row["cell_neighbors_processed"] = False
             continue
 
         anndata_path = anndata_path_pattern.format(**row)
@@ -116,21 +127,54 @@ if __name__ == "__main__":
 
         # Take care of some inconsistencies in the anndata file names:
         if not Path(anndata_path).exists():
-            anndata_path_pattern = root_pattern + "anndata/customdb_seadrugs_v2/{project}.{slide}.{row}{col}.cells.h5ad"
-            anndata_path = anndata_path_pattern.format(**row)
-            target_pattern_anndata_path = str(Path(target_pattern_anndata).parent / Path(anndata_path).name).format(**row)
-            if not Path(anndata_path).exists():
+            # TODO: there is actually a column 'experiment` in the metadata that specifies how the AnnData naming is defined
+            # Try to match any file with the following format:
+            test_anndata_pattern = root_pattern + "anndata/customdb_seadrugs_v2/{project}*.{slide}.{row}{col}.cells.h5ad"
+            test_anndata_path = test_anndata_pattern.format(**row)
+            test_anndata_paths = list(Path(test_anndata_path).parent.glob(Path(test_anndata_path).name))
+            if len(test_anndata_paths) == 1:
+                anndata_path = test_anndata_paths[0]
+                print(f"Found Anndata file: {anndata_path}")
+            else:
                 print(f"WARNING: Anndata path not found: {anndata_path}")
+                main_metadata.at[index, "cell_neighbors_processed"] = "Anndata not found"
                 continue
-
 
         # Load label ome-zarr:
         if not Path(label_zarr_path).exists():
             print(f"WARNING: Label zarr path not found: {label_zarr_path}")
+            main_metadata.at[index, "cell_neighbors_processed"] = "Zarr file not found"
+            continue
+
+        segmentation_mask = load_ome_zarr_channels(label_zarr_path, ['cells'])[0]
+        # try:
+        # except (FileNotFoundError, ArrayNotFoundError):
+        #     print(f"WARNING: Label zarr path not found or some problem loading it: {label_zarr_path}")
+        #     main_metadata.at[index, "cell_neighbors_processed"] = "Faulty zarr segmentation: encountered some problem loading it"
+        #     continue
+
+        # Now load the Anndata object:
+        adata = sc.read(anndata_path)
+
+        # We check whether the segmentation matches the anndata file, by comparing cell areas:
+        adata_cell_areas = adata.obs["area"]
+
+        if adata.obs.index.astype('int').max() > segmentation_mask.max():
+            print(f"WARNING: Number of cells {adata.obs.index.astype('int').max()} exceeds the number of cells in the segmentation mask. Original max: {segmentation_mask.max()} \n {anndata_path} \n {label_zarr_path}")
+            main_metadata.at[index, "cell_neighbors_processed"] = "Number of cells exceeds segmentation mask (segmentation not matching)"
+            continue
+
+        segmentation_cell_areas = np.bincount(segmentation_mask.ravel())
+        # In the adata object, only some cells are present (they were filtered) but the index IDs match the segmentation mask:
+        # segmentation_cell_areas_filtered = segmentation_cell_areas
+        segmentation_cell_areas_filtered = segmentation_cell_areas[adata.obs.index.astype('int')]
+        # Check if the areas are similar:
+        if not np.allclose(adata_cell_areas, segmentation_cell_areas_filtered, atol=1):
+            print(f"WARNING: Cell areas in the segmentation mask do not match the Anndata object. {anndata_path} \n {label_zarr_path}")
+            main_metadata.at[index, "cell_neighbors_processed"] = "Cell areas do not match segmentation mask"
             continue
 
         print(f"Processing {Path(anndata_path).name}...")
-        segmentation_mask = load_ome_zarr_channels(label_zarr_path, ['cells'])[0]
 
         # Experiment with growing the cells:
         if CELL_DILATION_RADIUS > 0:
@@ -181,13 +225,6 @@ if __name__ == "__main__":
             )
         )
 
-        # Now load the Anndata object:
-        adata = sc.read(anndata_path)
-
-        if adata.obs.index.astype('int').max() > len(nb_neighbors):
-            print(f"WARNING: Number of cells {adata.obs.index.astype('int').max()} exceeds the number of cells in the segmentation mask {len(nb_neighbors)}. Original max: {segmentation_mask.max()} \n {anndata_path} \n {label_zarr_path}")
-            continue
-
         # Restrict nb_neighbors to the cells in the Anndata object:
         adata.obs["number_neighboring_cells"] = nb_neighbors[adata.obs.index.astype('int')]
 
@@ -196,7 +233,7 @@ if __name__ == "__main__":
         adata.write(target_pattern_anndata_path)
 
         # Update metadata:
-        main_metadata.at[index, "cell_neighbors_processed"] = True
+        main_metadata.at[index, "cell_neighbors_processed"] = "True"
         # Save metadata, so that we can resume the processing if something goes wrong:
-        main_metadata.to_csv(metadata_csv_file_path, index=False)
+    main_metadata.to_csv(metadata_csv_file_path, index=False)
 

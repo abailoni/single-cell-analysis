@@ -1,5 +1,0 @@
-napari-ome-zarr
-anndata
-scipy
-h5py
-
